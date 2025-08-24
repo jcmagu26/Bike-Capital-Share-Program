@@ -1,0 +1,104 @@
+---
+title: "Stats Project 1"
+author: "Jane Maguire"
+date: "2024-11-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Casual vs. registered by weekday/weekend (stacked bar chart)
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+bike_data <- read.csv("data/day.csv")
+
+# Create a "day_type" column to categorize days as "Weekday" or "Weekend"
+bike_data <- bike_data %>%
+  mutate(day_type = ifelse(workingday == 1, "Weekday", "Weekend"))
+
+# Summarize the data by total counts of casual and registered users by day_type
+summary_data <- bike_data %>%
+  group_by(day_type) %>%
+  summarise(
+    total_casual = sum(casual),
+    total_registered = sum(registered)) %>%
+  pivot_longer(cols = c(total_casual, total_registered), 
+               names_to = "user_type", 
+               values_to = "count") %>%
+  mutate(user_type = recode(user_type, 
+                            "total_casual" = "Casual", 
+                            "total_registered" = "Registered"))
+
+# Create the stacked bar chart
+ggplot(summary_data, aes(x = day_type, y = count, fill = user_type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Casual vs. Registered Users by Weekday/Weekend",
+       x = "Day Type",
+       y = "Number of Rides",
+       fill = "User Type") +
+  scale_fill_manual(values = c("Casual" = "lightblue", "Registered" = "blue")) +
+  theme_minimal()
+
+# Calculate proportions within each day_type
+summary_data <- summary_data %>%
+  group_by(day_type) %>%
+  mutate(proportion = count / sum(count))
+
+# Create the stacked bar chart with proportions
+ggplot(summary_data, aes(x = day_type, y = proportion, fill = user_type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Proportion of Casual vs. Registered Users by Weekday/Weekend",
+       x = "Day Type",
+       y = "Proportion",
+       fill = "User Type") +
+  scale_y_continuous(labels = scales::percent) +  
+  scale_fill_manual(values = c("Casual" = "lightblue", "Registered" = "blue")) +
+  theme_minimal()
+```
+
+- Overall, there are a lot more riders on weekdays than there are on the weekends.
+- Proportionally, there are more casual riders on weekends(about 35%) than there are on weekdays(about 15%).
+
+
+# Number of casual vs registered (time series)
+```{r}
+daily_data <- bike_data %>%
+  group_by(dteday) %>%
+  summarise(
+    daily_casual = sum(casual),
+    daily_registered = sum(registered))
+
+# Reshape data to a long format for easier plotting
+daily_data_long <- daily_data %>%
+  pivot_longer(cols = c(daily_casual, daily_registered), 
+               names_to = "user_type", 
+               values_to = "count") %>%
+  mutate(user_type = recode(user_type, 
+                            "daily_casual" = "Casual", 
+                            "daily_registered" = "Registered"),
+         year = lubridate::year(as.Date(dteday)))
+
+# Plot with facetting by year
+ggplot(daily_data_long, aes(x = as.Date(dteday), y = count, color = user_type)) +
+  geom_line(size = 1) +
+  labs(title = "Daily Count of Casual vs. Registered Users by Year",
+       x = "Date",
+       y = "Number of Rides",
+       color = "User Type") +
+  theme_minimal() +
+  facet_wrap(~ year, scales = "free_x") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+- The number of riders increased from the year 2011 to the year 2012
+- We can also see by the curvature in the graph that over the course of both years the number of riders is lower in the winter months (January) than in the summer months (July).
+
+
+
+
